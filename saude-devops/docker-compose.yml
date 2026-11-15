@@ -1,0 +1,30 @@
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db        # volume nomeado: dados sobrevivem à recriação do container
+    networks: [rede]               # SEM "ports": banco não é publicado no host
+  api:
+    build: ./api
+    image: ${DOCKERHUB_USER:-gsun2005}/saude-api:v1
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+    depends_on: [mongo]
+    networks: [rede]
+  worker:
+    build: ./worker
+    image: ${DOCKERHUB_USER:-gsun2005}/saude-worker:v1
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+    depends_on: [mongo]
+    networks: [rede]
+  frontend:
+    build: ./frontend
+    image: ${DOCKERHUB_USER:-gsun2005}/saude-frontend:v1
+    ports: ["8080:80"]
+    depends_on: [api]
+    networks: [rede]
+networks:
+  rede:
+volumes:
+  mongo_data:

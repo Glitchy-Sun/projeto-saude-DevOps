@@ -1,0 +1,44 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Unidade de Saúde</title>
+<style>body{font-family:sans-serif;max-width:900px;margin:20px auto;padding:0 10px}
+header{background:#0a6;color:#fff;padding:10px}section{border:1px solid #ccc;margin:10px 0;padding:10px}
+input,select,button{margin:3px;padding:5px}li{margin:4px 0}</style></head><body>
+<header><h2>Unidade de Saúde — Agendamento <small>frontend v1 | API: <span id="ver">...</span></small></h2></header>
+<section><button onclick="seed()">Carregar dados de exemplo</button> <b id="msg"></b></section>
+<section><h3>Cadastrar paciente</h3><input id="pnome" placeholder="Nome"><button onclick="addPac()">Salvar</button></section>
+<section><h3>Cadastrar profissional</h3><input id="rnome" placeholder="Nome"><input id="resp" placeholder="Especialidade"><button onclick="addProf()">Salvar</button></section>
+<section><h3>Agendar consulta / Fila de espera</h3>
+ <select id="aPac" class="selPac"></select><select id="aProf" class="selProf"></select>
+ <input id="aData" type="date"><input id="aHora" type="time">
+ <button onclick="agendar()">Agendar</button><button onclick="entrarFila()">Entrar na fila</button>
+ <ul id="fila"></ul></section>
+<section><h3>Agenda do dia</h3><select id="gProf" class="selProf"></select><input id="gData" type="date">
+ <button onclick="agenda()">Ver agenda</button><ul id="agenda"></ul></section>
+<section><h3>Relatório: consultas por profissional</h3><button onclick="relatorio()">Atualizar</button><ul id="rel"></ul></section>
+<script>
+const $=id=>document.getElementById(id);
+async function call(path,method='GET',body){
+  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const j=await r.json(); if(!r.ok) throw new Error(j.erro||'erro'); return j;}
+const run=async f=>{try{await f();}catch(e){$('msg').textContent=e.message;}};
+async function carregar(){
+  const [p,r]=await Promise.all([call('/pacientes'),call('/profissionais')]);
+  document.querySelectorAll('.selPac').forEach(s=>s.innerHTML=p.map(x=>`<option value="${x._id}">${x.nome}</option>`).join(''));
+  document.querySelectorAll('.selProf').forEach(s=>s.innerHTML=r.map(x=>`<option value="${x._id}">${x.nome} (${x.especialidade})</option>`).join(''));
+  const f=await call('/fila');
+  $('fila').innerHTML=f.map(x=>`<li>Fila: ${x.pacienteNome} → ${x.profissionalNome} em ${x.data} ${x.horario}</li>`).join('');
+}
+const addPac=()=>run(async()=>{await call('/pacientes','POST',{nome:$('pnome').value});$('pnome').value='';$('msg').textContent='Paciente salvo';carregar();});
+const addProf=()=>run(async()=>{await call('/profissionais','POST',{nome:$('rnome').value,especialidade:$('resp').value});$('msg').textContent='Profissional salvo';carregar();});
+const dados=()=>({pacienteId:$('aPac').value,profissionalId:$('aProf').value,data:$('aData').value,horario:$('aHora').value});
+const agendar=()=>run(async()=>{await call('/consultas','POST',dados());$('msg').textContent='Consulta agendada';});
+const entrarFila=()=>run(async()=>{await call('/fila','POST',dados());$('msg').textContent='Adicionado à fila';carregar();});
+const agenda=()=>run(async()=>{
+  const l=await call(`/agenda?profissionalId=${$('gProf').value}&data=${$('gData').value}`);
+  $('agenda').innerHTML=l.map(c=>`<li>${c.horario} - ${c.pacienteNome} [${c.status}] ${c.status==='agendada'?`<button onclick="cancelar('${c._id}')">Cancelar</button>`:''}</li>`).join('')||'<li>Sem consultas</li>';});
+const cancelar=id=>run(async()=>{const r=await call('/consultas/'+id,'DELETE');$('msg').textContent='Cancelada'+(r.promovidoDaFila?` — vaga dada a ${r.promovidoDaFila} (fila)`:'');agenda();carregar();});
+const relatorio=()=>run(async()=>{const l=await call('/relatorio');$('rel').innerHTML=l.map(x=>`<li>${x.profissional}: ${x.total} consulta(s) (${x.concluidas} concluída(s))</li>`).join('')||'<li>Sem dados</li>';});
+const seed=()=>run(async()=>{const r=await call('/seed','POST');$('msg').textContent=r.mensagem;carregar();});
+$('aData').value=$('gData').value=new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
+fetch('/api/version').then(r=>r.json()).then(v=>$('ver').textContent=v.versao+' (pod '+v.pod+')');
+carregar();
+</script></body></html>
