@@ -3,6 +3,12 @@
 **Problema:** em postos de saúde, o horário de quem falta é desperdiçado enquanto outras pessoas esperam semanas.
 **Solução:** cadastro de pacientes/profissionais, agendamento sem conflito de horário, cancelamento (a vaga liberada vai automaticamente para o 1º da fila de espera), agenda do dia e relatório.
 
+## Integrantes
+- Jairo de Cassio
+- Matheus Heringe
+- Marco Tulio
+- Timoteo Augusto
+
 ## Arquitetura
 
 ```
@@ -33,6 +39,32 @@ docker compose rm -sf mongo && docker compose up -d mongo   # recria o container
 docker compose down -v   # só se quiser apagar tudo, inclusive o volume
 ```
 Provar que o Mongo não está exposto: `docker compose ps` (sem mapeamento de porta no mongo).
+
+## Como foi testado
+Testes feitos no Docker Compose (Docker 29.9.2, Compose v5.6.1), em 26/11/2026, com `docker compose up -d --build` e chamadas à API pelo proxy do frontend (`http://localhost:8080/api/...`).
+
+**Serviços no ar** (`docker compose ps`):
+```
+api:      3000/tcp
+frontend: 0.0.0.0:8080->80/tcp
+mongo:    27017/tcp        <- sem mapeamento para o host
+worker:   8080/tcp
+```
+
+| Teste | Requisição | Resultado |
+|---|---|---|
+| Frontend acessível | `GET /` | `200` |
+| Saúde da API + Mongo | `GET /api/health` | `200 {"status":"ok"}` |
+| Versão | `GET /api/version` | `200 {"versao":"v1"}` |
+| Dados de exemplo (R3) | `POST /api/seed` | `200`: 3 pacientes e 2 profissionais criados |
+| Agendamento | `POST /api/consultas` (amanhã 10:00) | `201`, status `agendada` |
+| Conflito de horário | mesmo profissional/data/horário | `409` "Horário já ocupado para este profissional. Entre na fila de espera." |
+| Data/horário passado | `POST /api/consultas` (ontem) | `400` "Não é possível agendar em data/horário passado" |
+| Fila de espera | `POST /api/fila` (horário ocupado) | `201` |
+| Cancelamento + promoção da fila | `DELETE /api/consultas/:id` | `200 {"cancelada":true,"promovidoDaFila":"João Souza"}`; a agenda passa a mostrar João Souza às 10:00 e a fila fica vazia |
+| Worker (rotina a cada minuto) | `docker compose logs worker` | `consultas concluídas: 1` (a consulta de ontem do seed foi marcada como `concluida`; o relatório passou a mostrar `concluidas: 1`) |
+| Volume do Mongo (D3) | `docker compose rm -sf mongo && docker compose up -d mongo` | container recriado (novo ID), os 3 pacientes continuam lá (volume `saude-devops_mongo_data`) |
+| Mongo não exposto | conexão em `localhost:27017` a partir do host | recusada |
 
 ## Docker Hub (D4)
 ```bash

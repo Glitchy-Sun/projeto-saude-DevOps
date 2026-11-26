@@ -11,6 +11,9 @@ spec:
         - name: frontend
           image: gsun2005/saude-frontend:v1
           ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
 ---
 apiVersion: v1
 kind: Service

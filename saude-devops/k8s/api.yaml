@@ -11,6 +11,9 @@ spec:
         - name: api
           image: gsun2005/saude-api:v1
           ports: [{ containerPort: 3000 }]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
           env: [{ name: MONGO_URL, value: "mongodb://mongo:27017" }]
           readinessProbe:
             httpGet: { path: /api/health, port: 3000 }
