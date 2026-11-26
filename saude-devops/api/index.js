@@ -52,6 +52,8 @@ app.post('/api/consultas', h(async (req, res) => {
   const { pacienteId, profissionalId, data, horario } = req.body;
   if (!ok(pacienteId) || !ok(profissionalId) || !dataOk(data) || !horaOk(horario))
     return res.status(400).json({ erro: 'dados inválidos' });
+  if (toDate(data, horario) < new Date())
+    return res.status(400).json({ erro: 'Não é possível agendar em data/horário passado' });
   const pac = await db.collection('pacientes').findOne({ _id: new ObjectId(pacienteId) });
   const prof = await db.collection('profissionais').findOne({ _id: new ObjectId(profissionalId) });
   if (!pac || !prof) return res.status(404).json({ erro: 'paciente ou profissional não encontrado' });
